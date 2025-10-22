@@ -13,14 +13,14 @@ app = FastAPI(title="Restaurant Recommender API")
 # CORS for frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8000", "http://127.0.0.1:8000", "https://zac-garland.github.io"],
+    allow_origins=["http://localhost:8000", "http://127.0.0.1:8000", "https://roguetex.github.io"],
     allow_credentials=True,
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
 
 # Load model and data
-model = SentenceTransformer('all-MiniLM-L6-v2')
+model = SentenceTransformer('paraphrase-MiniLM-L3-v2')  # Smaller, faster model
 conn = sqlite3.connect('../austin_restaurants.db')
 restaurants_df = pd.read_sql('SELECT * FROM restaurants', conn)
 reviews_df = pd.read_sql('SELECT * FROM reviews', conn)
@@ -86,9 +86,17 @@ def search_restaurants(request: SearchRequest):
             combined = f"{row['name']} {row['place_tags']} {review_text}"
             search_texts.append(combined)
         
-        # Encode query and all restaurant texts
+        # Encode query and all restaurant texts in batches to save memory
         query_emb = model.encode([query])
-        rest_emb = model.encode(search_texts)
+        
+        # Batch encoding to reduce memory usage
+        batch_size = 50
+        rest_emb = []
+        for i in range(0, len(search_texts), batch_size):
+            batch = search_texts[i:i+batch_size]
+            batch_emb = model.encode(batch)
+            rest_emb.extend(batch_emb)
+        
         sim = cosine_similarity(query_emb, rest_emb)[0]
         filtered['similarity'] = sim
         
