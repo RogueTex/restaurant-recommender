@@ -19,11 +19,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Load model and data
-model = SentenceTransformer('paraphrase-MiniLM-L3-v2')  # Smaller, faster model
-conn = sqlite3.connect('../austin_restaurants.db')
-restaurants_df = pd.read_sql('SELECT * FROM restaurants', conn)
-reviews_df = pd.read_sql('SELECT * FROM reviews', conn)
+# Load model and data lazily
+model = None
+restaurants_df = None
+reviews_df = None
+
+def load_data():
+    global model, restaurants_df, reviews_df
+    if model is None:
+        model = SentenceTransformer('paraphrase-MiniLM-L3-v2')
+    if restaurants_df is None:
+        conn = sqlite3.connect('../austin_restaurants.db')
+        restaurants_df = pd.read_sql('SELECT * FROM restaurants', conn)
+        reviews_df = pd.read_sql('SELECT * FROM reviews', conn)
+        conn.close()
 
 class SearchRequest(BaseModel):
     query: str
@@ -48,6 +57,7 @@ def read_root():
 
 @app.post("/search")
 def search_restaurants(request: SearchRequest):
+    load_data()  # Load data on first request
     query = request.query
     
     # Filter restaurants - use all restaurants initially
