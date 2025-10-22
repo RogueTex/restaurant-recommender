@@ -1,11 +1,10 @@
+import os
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import pandas as pd
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
-import sqlite3
-import json
 import math
 
 app = FastAPI(title="Restaurant Recommender API")
@@ -19,9 +18,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-import os
-# ... existing imports ...
-
 # Load model and data lazily
 model = None
 restaurants_df = None
@@ -33,14 +29,25 @@ def load_data():
         model = SentenceTransformer('paraphrase-MiniLM-L3-v2')
     if restaurants_df is None:
         db_url = os.environ.get('DATABASE_URL', 'sqlite:///austin_restaurants.db')
-        if db_url.startswith('sqlite'):
-            conn = sqlite3.connect('../austin_restaurants.db')
-        else:
+        if db_url.startswith('mongodb'):
+            from pymongo import MongoClient
+            client = MongoClient(db_url)
+            db = client['restaurant_db']
+            restaurants_df = pd.DataFrame(list(db.restaurants.find()))
+            reviews_df = pd.DataFrame(list(db.reviews.find()))
+            client.close()
+        elif db_url.startswith('postgresql'):
             import psycopg2
             conn = psycopg2.connect(db_url)
-        restaurants_df = pd.read_sql('SELECT * FROM restaurants', conn)
-        reviews_df = pd.read_sql('SELECT * FROM reviews', conn)
-        conn.close()
+            restaurants_df = pd.read_sql('SELECT * FROM restaurants', conn)
+            reviews_df = pd.read_sql('SELECT * FROM reviews', conn)
+            conn.close()
+        else:
+            import sqlite3
+            conn = sqlite3.connect('../austin_restaurants.db')
+            restaurants_df = pd.read_sql('SELECT * FROM restaurants', conn)
+            reviews_df = pd.read_sql('SELECT * FROM reviews', conn)
+            conn.close()
 
 class SearchRequest(BaseModel):
     query: str

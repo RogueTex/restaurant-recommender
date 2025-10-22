@@ -24,5 +24,10 @@ plotly>=5.10.0
 # sqlite3  # Built-in Python module
 
 # Google Places API
-googlemaps>=4.10.0
+fastapi
+uvicorn[standard]
+pandas
+sentence-transformers
+scikit-learn
+pymongo
 psycopg2-binary
