@@ -19,6 +19,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+import os
+# ... existing imports ...
+
 # Load model and data lazily
 model = None
 restaurants_df = None
@@ -29,7 +32,12 @@ def load_data():
     if model is None:
         model = SentenceTransformer('paraphrase-MiniLM-L3-v2')
     if restaurants_df is None:
-        conn = sqlite3.connect('../austin_restaurants.db')
+        db_url = os.environ.get('DATABASE_URL', 'sqlite:///austin_restaurants.db')
+        if db_url.startswith('sqlite'):
+            conn = sqlite3.connect('../austin_restaurants.db')
+        else:
+            import psycopg2
+            conn = psycopg2.connect(db_url)
         restaurants_df = pd.read_sql('SELECT * FROM restaurants', conn)
         reviews_df = pd.read_sql('SELECT * FROM reviews', conn)
         conn.close()
