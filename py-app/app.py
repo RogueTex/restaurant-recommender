@@ -137,82 +137,80 @@ def calculate_tfidf_scores(restaurants, reviews, query):
         restaurants_sample = restaurants
         reviews_sample = reviews
     
-    # Aggregate reviews per restaurant
-    review_texts = reviews_sample.groupby('restaurant_id')['text'].apply(
-        lambda x: ' '.join(x)
-    ).reset_index()
+        # Aggregate reviews per restaurant
+        review_texts = reviews_sample.groupby('restaurant_id')['text'].apply(lambda x: ' '.join(x)).reset_index()
     
-    # Merge with restaurant info
-    restaurants_with_reviews = restaurants_sample.merge(
-        review_texts, 
-        left_on='id', 
-        right_on='restaurant_id', 
-        how='left'
-    )
+        # Merge with restaurant info
+        restaurants_with_reviews = restaurants_sample.merge(
+            review_texts, 
+            left_on='id', 
+            right_on='restaurant_id', 
+            how='left'
+        )
     
-    # Create combined text: name + cuisine + reviews
-    restaurants_with_reviews['combined_text'] = (
-        restaurants_with_reviews['name'] + ' ' + 
-        restaurants_with_reviews['cuisine'].fillna('') + ' ' + 
-        restaurants_with_reviews['text'].fillna('')
-    ).apply(preprocess_text)
+        # Create combined text: name + cuisine + reviews
+        restaurants_with_reviews['combined_text'] = (
+            restaurants_with_reviews['name'] + ' ' + 
+            restaurants_with_reviews['cuisine'].fillna('') + ' ' + 
+            restaurants_with_reviews['text'].fillna('')
+        ).apply(preprocess_text)
     
-    # TF-IDF Vectorization with more lenient parameters
-    vectorizer = TfidfVectorizer(
-        max_features=1000,
-        stop_words='english',
-        ngram_range=(1, 2),
-        min_df=1,  # Include terms that appear in at least 1 document
-        max_df=0.98,  # More lenient - exclude terms in more than 98% of documents
-        lowercase=True,
-        strip_accents='unicode'
-    )
+        # TF-IDF Vectorization with more lenient parameters
+        vectorizer = TfidfVectorizer(
+            max_features=1000,
+            stop_words='english',
+            ngram_range=(1, 2),
+            min_df=1,  # Include terms that appear in at least 1 document
+            max_df=0.98,  # More lenient - exclude terms in more than 98% of documents
+            lowercase=True,
+            strip_accents='unicode'
+        )
     
-    # Fit on restaurant texts
-    tfidf_matrix = vectorizer.fit_transform(
-        restaurants_with_reviews['combined_text']
-    )
+        # Fit on restaurant texts
+        tfidf_matrix = vectorizer.fit_transform(
+            restaurants_with_reviews['combined_text']
+        )
     
-    # Transform query with preprocessing
-    processed_query = preprocess_text(query)
-    query_vec = vectorizer.transform([processed_query])
+        # Transform query with preprocessing
+        processed_query = preprocess_text(query)
+        query_vec = vectorizer.transform([processed_query])
     
-    # Calculate cosine similarity (CONCEPT: Cosine Similarity)
-    similarities = cosine_similarity(query_vec, tfidf_matrix).flatten()
+        # Calculate cosine similarity (CONCEPT: Cosine Similarity)
+        similarities = cosine_similarity(query_vec, tfidf_matrix).flatten()
     
-    restaurants_with_reviews['similarity_score'] = similarities
+        restaurants_with_reviews['similarity_score'] = similarities
     
-    # If no matches found, try fuzzy matching with restaurant names
-    if similarities.max() == 0:
-        print(f"No TF-IDF matches found for query: '{query}'")
-        # Add name-based similarity as fallback
-        query_lower = query.lower()
-        name_similarities = []
-        for _, row in restaurants_with_reviews.iterrows():
-            name = str(row['name']).lower()
-            cuisine = str(row['cuisine']) if pd.notna(row['cuisine']) else ''
-            cuisine = cuisine.lower()
+        # If no matches found, try fuzzy matching with restaurant names
+        if similarities.max() == 0:
+            print(f"No TF-IDF matches found for query: '{query}'")
+            # Add name-based similarity as fallback
+            query_lower = query.lower()
+            name_similarities = []
+            for _, row in restaurants_with_reviews.iterrows():
+                name = str(row['name']).lower()
+                cuisine = str(row['cuisine']) if pd.notna(row['cuisine']) else ''
+                cuisine = cuisine.lower()
             
-            # Simple keyword matching
-            name_score = 0
-            if query_lower in name:
-                name_score += 0.5
-            if query_lower in cuisine:
-                name_score += 0.3
+                # Simple keyword matching
+                name_score = 0
+                if query_lower in name:
+                    name_score += 0.5
+                if query_lower in cuisine:
+                    name_score += 0.3
             
-            # Check for partial matches
-            query_words = query_lower.split()
-            for word in query_words:
-                if word in name:
-                    name_score += 0.2
-                if word in cuisine:
-                    name_score += 0.1
+                # Check for partial matches
+                query_words = query_lower.split()
+                for word in query_words:
+                    if word in name:
+                        name_score += 0.2
+                    if word in cuisine:
+                        name_score += 0.1
             
-            name_similarities.append(name_score)
+                name_similarities.append(name_score)
         
-        restaurants_with_reviews['similarity_score'] = name_similarities
+            restaurants_with_reviews['similarity_score'] = name_similarities
     
-    return restaurants_with_reviews.sort_values('similarity_score', ascending=False)
+        return restaurants_with_reviews.sort_values('similarity_score', ascending=False)
     
     except Exception as e:
         print(f"TF-IDF calculation failed: {e}")
@@ -514,48 +512,85 @@ app_ui = ui.page_fluid(
             alert('Clicked restaurant: ' + $(this).find('strong').text() + 
                   '\\nLocation: ' + lat + ', ' + lng);
         });
+        
+        // Geolocation
+        $(document).on('click', '#location_btn', function() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(function(position) {
+                    var lat = position.coords.latitude;
+                    var lng = position.coords.longitude;
+                    Shiny.setInputValue('user_lat', lat);
+                    Shiny.setInputValue('user_lng', lng);
+                    alert('Location shared! You will see a red dot on the map.');
+                }, function(error) {
+                    alert('Location access denied or unavailable.');
+                });
+            } else {
+                alert('Geolocation is not supported by this browser.');
+            }
+        });
     """),
     
     # Navigation
     ui.navset_tab(
         # ====================================================================
-        # TAB 1: LANDING PAGE
+        # TAB 1: LANDING PAGE (ChatGPT-Style)
         # ====================================================================
         ui.nav_panel(
             "🏠 Home",
             ui.div(
-                {"class": "landing-page"},
-                ui.h1("🍽️ RestaurantAI", {"class": "hero-title"}),
-                ui.p("Find your perfect dining experience using advanced ML-powered search", 
-                     style="font-size: 1.5rem; margin-bottom: 3rem;"),
-                
+                # Background styling
+                ui.tags.style("""
+                    .home-bg {
+                        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+                        position: absolute;
+                        top: 0;
+                        left: 0;
+                        width: 100%;
+                        height: 100%;
+                        z-index: -1;
+                    }
+                    .centered-input {
+                        position: absolute;
+                        top: 50%;
+                        left: 50%;
+                        transform: translate(-50%, -50%);
+                        width: 60%;
+                        max-width: 600px;
+                        text-align: center;
+                    }
+                    .search-input {
+                        font-size: 24px;
+                        padding: 20px;
+                        border: 2px solid #ccc;
+                        border-radius: 10px;
+                        width: 100%;
+                        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+                        margin-bottom: 20px;
+                    }
+                    .location-btn {
+                        margin-top: 10px;
+                        background: #28a745;
+                        border: none;
+                        padding: 10px 20px;
+                        border-radius: 5px;
+                        color: white;
+                        cursor: pointer;
+                    }
+                """),
+                ui.div(class_="home-bg"),
                 ui.div(
-                    {"class": "search-container"},
                     ui.input_text(
-                        "main_search",
-                        None,
-                        placeholder="Try: 'romantic Italian with outdoor seating' or 'spicy vegan brunch'...",
+                        "query",
+                        "",
+                        placeholder="What would you like to eat today? Are you craving some food? :)",
                         width="100%"
                     ),
-                    ui.input_action_button(
-                        "search_btn",
-                        "🔍 Search Restaurants",
-                        class_="btn-lg btn-primary",
-                        style="margin-top: 1rem; padding: 15px 30px; font-size: 1.2rem;"
-                    )
+                    ui.input_action_button("search_btn", "Search", class_="btn btn-primary btn-lg"),
+                    ui.input_action_button("location_btn", "Share Location", class_="location-btn"),
+                    **{"class": "centered-input"}
                 ),
-                
-                ui.div(
-                    {"style": "margin-top: 4rem;"},
-                    ui.h3("Powered by Advanced NLP & ML"),
-                    ui.row(
-                        ui.column(3, ui.div("🎯 BERT Embeddings", style="font-weight: 600;")),
-                        ui.column(3, ui.div("📊 TF-IDF Ranking", style="font-weight: 600;")),
-                        ui.column(3, ui.div("😊 Sentiment Analysis", style="font-weight: 600;")),
-                        ui.column(3, ui.div("🏷️ Topic Modeling", style="font-weight: 600;")),
-                    )
-                )
-            )
+            ),
         ),
         
         # ====================================================================
@@ -574,16 +609,6 @@ app_ui = ui.page_fluid(
                         
                         ui.input_text("query_input", "Search Query", 
                                      placeholder="e.g., romantic Italian"),
-                        
-                        ui.input_select(
-                            "similarity_method",
-                            "Similarity Method",
-                            choices={
-                                "tfidf": "TF-IDF (Fast)",
-                                "bert": "BERT Embeddings (Semantic)"
-                            },
-                            selected="tfidf"
-                        ),
                         
                         ui.input_selectize(
                             "cuisine_filter",
@@ -711,6 +736,43 @@ app_ui = ui.page_fluid(
 )
 
 
+def parse_query_filters(query):
+    """Parse natural language query for filters"""
+    filters = {}
+    query_lower = query.lower()
+    
+    # Cuisine types
+    cuisines = []
+    if 'italian' in query_lower:
+        cuisines.append('italian')
+    if 'mexican' in query_lower or 'taco' in query_lower:
+        cuisines.append('mexican')
+    if 'chinese' in query_lower or 'asian' in query_lower:
+        cuisines.append('chinese')
+    if 'american' in query_lower:
+        cuisines.append('american')
+    if 'bar' in query_lower or 'beer' in query_lower:
+        cuisines.append('bar')
+    if 'cafe' in query_lower or 'coffee' in query_lower:
+        cuisines.append('cafe')
+    
+    if cuisines:
+        filters['cuisine'] = cuisines
+    
+    # Dietary
+    if 'vegan' in query_lower or 'vegetarian' in query_lower:
+        filters['vegetarian'] = True
+    
+    # Service
+    if 'takeout' in query_lower or 'take out' in query_lower:
+        filters['takeout'] = True
+    
+    if 'outdoor' in query_lower or 'outside' in query_lower:
+        filters['outdoor'] = True
+    
+    return filters
+
+
 # ============================================================================
 # SHINY SERVER
 # ============================================================================
@@ -726,38 +788,41 @@ def server(input, output, session):
     def navigate_to_search():
         navigate_to_search_results()
     
-    # Also handle Enter key press in main search
-    @reactive.Effect
-    @reactive.event(input.main_search)
-    def handle_enter_search():
-        # This will trigger when user types in main_search
-        pass
-    
     def navigate_to_search_results():
         """Navigate to search results and populate query"""
         # Switch to Search Results tab
         ui.update_navset("main_tabs", selected="Search Results")
         
-        # Copy main_search value to query_input
-        if input.main_search():
-            ui.update_text("query_input", value=input.main_search())
+        # Copy query value to query_input
+        if input.query():
+            ui.update_text("query_input", value=input.query())
     
     # Reactive: Filtered restaurants based on search and filters
     @reactive.Calc
     def filtered_restaurants():
-        query = input.query_input() or input.main_search() or ""
+        query = input.query_input() or input.query() or ""
+        
+        # Parse query for filters
+        parsed_filters = parse_query_filters(query)
         
         if not query:
             filtered = restaurants_df.copy()
         else:
-            # Apply similarity ranking based on selected method
-            similarity_method = input.similarity_method()
-            if similarity_method == "bert":
-                filtered = calculate_bert_similarity(restaurants_df, reviews_df, query)
-            else:
-                filtered = calculate_tfidf_scores(restaurants_df, reviews_df, query)
+            # Use BERT for semantic similarity (better for natural language)
+            filtered = calculate_bert_similarity(restaurants_df, reviews_df, query)
         
-        # Apply filters
+        # Apply parsed filters
+        if parsed_filters.get('vegetarian'):
+            filtered = filtered[filtered['serves_vegetarian'] == True]
+        if parsed_filters.get('takeout'):
+            filtered = filtered[filtered['takeout'] == True]
+        if parsed_filters.get('outdoor'):
+            filtered = filtered[filtered['outdoor_seating'] == True]
+        if parsed_filters.get('cuisine'):
+            cuisine_mask = filtered['cuisine'].str.contains('|'.join(parsed_filters['cuisine']), case=False, na=False)
+            filtered = filtered[cuisine_mask]
+        
+        # Apply UI filters
         if input.rating_filter():
             filtered = filtered[filtered['rating'] >= input.rating_filter()]
         
@@ -800,7 +865,7 @@ def server(input, output, session):
         hover_texts = []
         for idx, row in df.iterrows():
             # Get sample reviews for this restaurant
-            restaurant_reviews = reviews_df().query(f"restaurant_id == {row['id']}").nlargest(3, 'rating')
+            restaurant_reviews = reviews_df[reviews_df['restaurant_id'] == row['id']].nlargest(3, 'rating')
             
             # Create star rating display
             rating_val = row['rating'] if pd.notna(row['rating']) else 0
@@ -958,6 +1023,19 @@ def server(input, output, session):
             name='Below 3.5',
             showlegend=True
         ))
+        
+        # Add user location if available
+        user_lat = input.user_lat()
+        user_lng = input.user_lng()
+        if user_lat and user_lng:
+            fig.add_trace(go.Scattermapbox(
+                lat=[user_lat],
+                lon=[user_lng],
+                mode='markers',
+                marker=dict(size=15, color='red', symbol='circle'),
+                name='Your Location',
+                showlegend=True
+            ))
         
         return ui.HTML(fig.to_html(include_plotlyjs='cdn'))
     

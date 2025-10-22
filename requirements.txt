@@ -2,6 +2,11 @@
 # Core web framework
 shiny>=0.8.0
 
+# Backend API
+fastapi>=0.100.0
+uvicorn[standard]>=0.20.0
+pydantic>=2.0.0
+
 # Data manipulation and analysis
 pandas>=1.5.0
 numpy>=1.21.0
@@ -16,8 +21,7 @@ torch>=1.12.0
 plotly>=5.10.0
 
 # Database connectivity
-sqlite3  # Built-in Python module
+# sqlite3  # Built-in Python module
 
-# Utilities
-os  # Built-in Python module
-warnings  # Built-in Python module
+# Google Places API
+googlemaps>=4.10.0
